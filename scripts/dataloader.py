@@ -100,8 +100,9 @@ if __name__ == "__main__":
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=True)
     # データを取り出す
     for i, (images, labels, img_paths) in enumerate(dataloader):
-        print(images.shape)
-        print(labels)
-        print(img_paths)
+        #print(images.shape)
+        #print(labels[:,1])
+        #print(img_paths)
+        print(len(dataloader))
         break
     

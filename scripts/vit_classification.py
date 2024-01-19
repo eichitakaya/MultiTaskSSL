@@ -1,5 +1,6 @@
 """
 RadImageNetにおける165値の分類問題を解く
+モデルはViTを使用
 """
 # ライブラリのインポート
 import os
@@ -14,13 +15,13 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from dataloader import RadImageNet
 
-batchsize = 2048
+batchsize = 512
 
 # データセットのパス
 dataset_path = "/takaya_workspace/Medical_AI/data/RadImageNet"
 
 # 結果の保存先（なければmkdir）
-result_path = "../result/RadImageNet_Classification165"
+result_path = "../result/RadImageNet_Classification165_ViT"
 if not os.path.exists(result_path):
     os.mkdir(result_path)
 
@@ -42,8 +43,8 @@ train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batchsi
 val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batchsize, shuffle=True)
 test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=batchsize, shuffle=True)
 
-# モデルの定義
-model = torchvision.models.resnet18(pretrained=True)
+# ViTモデルの定義
+model = torchvision.models.vit_b_16(weights=torchvision.models.ViT_B_16_Weights.DEFAULT)
 # モデルの最終層の出力ユニットを165に変更
 model.fc = nn.Linear(in_features=512, out_features=165, bias=True)
 

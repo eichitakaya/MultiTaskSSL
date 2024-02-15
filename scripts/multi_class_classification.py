@@ -12,7 +12,7 @@ from torchvision import transforms
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from dataloader import RadImageNet
+from radimagenet_dataset import RadImageNet
 
 batchsize = 2048
 
@@ -67,7 +67,7 @@ print("device: ", device)
 model.to(device)
 
 # 学習
-num_epochs = 10
+num_epochs = 20
 train_loss_list = []
 val_loss_list = []
 train_acc_list = []

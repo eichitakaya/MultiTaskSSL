@@ -13,7 +13,7 @@ from torchvision import transforms
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from dataloader import RadImageNet
+from radimagenet_dataset import RadImageNet
 
 batchsize = 512
 
@@ -68,7 +68,7 @@ print("device: ", device)
 model.to(device)
 
 # 学習
-num_epochs = 10
+num_epochs = 20
 train_loss_list = []
 val_loss_list = []
 train_acc_list = []
@@ -108,20 +108,21 @@ with tqdm(range(num_epochs)) as pbar_epoch:
         val_loss = 0.0
         val_corrects = 0
         #with tqdm(enumerate(val_dataloader), total=len(val_dataloader)) as pbar_batch:
-        for inputs, labels, paths in val_dataloader:
-            inputs = inputs.to(device)
-            labels = labels[:, 2].to(device)
-            optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
-            _, preds = torch.max(outputs, 1)
-            val_loss += loss.item() * inputs.size(0)
-            val_corrects += torch.sum(preds == labels.data)
-        val_loss = val_loss / len(val_dataset)
-        val_acc = val_corrects.double() / len(val_dataset)
-        val_loss_list.append(val_loss)
-        val_acc_list.append(val_acc)
-        print("val loss: {:.4f}, val acc: {:.4f}".format(val_loss, val_acc))
+        with torch.no_grad():
+            for inputs, labels, paths in val_dataloader:
+                inputs = inputs.to(device)
+                labels = labels[:, 2].to(device)
+                optimizer.zero_grad()
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
+                _, preds = torch.max(outputs, 1)
+                val_loss += loss.item() * inputs.size(0)
+                val_corrects += torch.sum(preds == labels.data)
+            val_loss = val_loss / len(val_dataset)
+            val_acc = val_corrects.double() / len(val_dataset)
+            val_loss_list.append(val_loss)
+            val_acc_list.append(val_acc)
+            print("val loss: {:.4f}, val acc: {:.4f}".format(val_loss, val_acc))
         
         scheduler.step()
 
@@ -144,15 +145,16 @@ model.eval()
 test_loss = 0.0
 test_corrects = 0
 with tqdm(enumerate(test_dataloader), total=len(test_dataloader)) as pbar_batch:
-    for i, (inputs, labels, paths) in pbar_batch:
-        inputs = inputs.to(device)
-        labels = labels[:, 2].to(device)
-        optimizer.zero_grad()
-        outputs = model(inputs)
-        loss = criterion(outputs, labels)
-        _, preds = torch.max(outputs, 1)
-        test_loss += loss.item() * inputs.size(0)
-        test_corrects += torch.sum(preds == labels.data)
+    with torch.no_grad():
+        for i, (inputs, labels, paths) in pbar_batch:
+            inputs = inputs.to(device)
+            labels = labels[:, 2].to(device)
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            _, preds = torch.max(outputs, 1)
+            test_loss += loss.item() * inputs.size(0)
+            test_corrects += torch.sum(preds == labels.data)
 test_loss = test_loss / len(test_dataset)
 test_acc = test_corrects / len(test_dataset)
 

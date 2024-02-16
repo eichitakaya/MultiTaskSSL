@@ -48,9 +48,8 @@ def downstream(model_init, dataset):
         # testは、valのlossが最小のモデルを使用
         best_val_loss = 10000
         model.train()
-        preds_labels_all = []
-        
-        for epoch in range(10):
+
+        for epoch in range(1):
             model.train()
             running_loss = 0.0
             for inputs, labels in train_dataloader:
@@ -127,9 +126,91 @@ model.fc = nn.Linear(in_features=512, out_features=165, bias=True)
 
 # モデルの評価
 result = downstream(model, dataset=args.dataset)
-
+#print(result)
 # 評価結果の集計と保存
-# result自体をcsvに保存
+# result自体を5つのcsvに保存
 # acc, auc, sensitivity, specificityを計算し、csvに保存
 # roc_curveを各foldについて描画、平均のROC曲線も重ねて描画
-# 保存先はmodel_pathと同じディレクトリにresult.csv, roc_curve.png
+# 保存先はmodel_pathと同じディレクトリに{dataset}_result.csv, {dataset}_roc_curve.png
+
+# resultの保存
+import csv
+# model_pathからmodel.pthを取り除いたものを取得
+model_path = args.model_path.split("/")
+model_path = "/".join(model_path[:-1])
+# foldごとの結果を保存
+for i in range(5):
+    with open("{}/{}_fold_{}.csv".format(model_path, args.dataset, i+1), "w") as f:
+        writer = csv.writer(f)
+        writer.writerow(["preds", "labels"])
+        # 1である確率とlabelsを保存
+        for j in range(len(result[i][0])):
+            writer.writerow([result[i][0][j], result[i][1][j]])
+
+# 各foldでのacc, auc, sensitivity, specificityを計算
+import sklearn.metrics as metrics
+accs = []
+aucs = []
+sensitivities = []
+specificities = []
+
+for i in range(5):
+    preds = result[i][0]
+    labels = result[i][1]
+    preds = np.array(preds)
+    labels = np.array(labels)
+    fpr, tpr, thresholds = metrics.roc_curve(labels, preds)
+    auc = metrics.auc(fpr, tpr)
+    acc = metrics.accuracy_score(labels, np.where(preds > 0.5, 1, 0))
+    tn, fp, fn, tp = metrics.confusion_matrix(labels, np.where(preds > 0.5, 1, 0)).ravel()
+    sensitivity = tp / (tp + fn)
+    specificity = tn / (tn + fp)
+    accs.append(acc)
+    aucs.append(auc)
+    sensitivities.append(sensitivity)
+    specificities.append(specificity)
+
+# 平均のacc, auc, sensitivity, specificityを計算
+acc_mean = np.mean(accs)
+auc_mean = np.mean(aucs)
+sensitivity_mean = np.mean(sensitivities)
+specificity_mean = np.mean(specificities)
+
+# accs, aucs, sensitivities, specificitiesおよびそれらの平均をcsvに保存
+with open("{}/{}_stats.csv".format(model_path, args.dataset), "w") as f:
+    writer = csv.writer(f)
+    writer.writerow(["acc", "auc", "sensitivity", "specificity"])
+    for i in range(5):
+        writer.writerow([accs[i], aucs[i], sensitivities[i], specificities[i]])
+    writer.writerow([acc_mean, auc_mean, sensitivity_mean, specificity_mean])
+
+# roc_curveを5つのfoldについて1つの図に描画。平均のROC曲線も描画。
+plt.figure()
+for i in range(5):
+    preds = result[i][0]
+    labels = result[i][1]
+    preds = np.array(preds)
+    labels = np.array(labels)
+    fpr, tpr, thresholds = metrics.roc_curve(labels, preds)
+    auc = metrics.auc(fpr, tpr)
+    # 色は全て薄い灰色
+    plt.plot(fpr, tpr, color="lightgray")
+# 平均のROC曲線を描画
+preds_all = []
+labels_all = []
+for i in range(5):
+    preds_all.extend(result[i][0])
+    labels_all.extend(result[i][1])
+preds_all = np.array(preds_all)
+labels_all = np.array(labels_all)
+fpr, tpr, thresholds = metrics.roc_curve(labels_all, preds_all)
+auc = metrics.auc(fpr, tpr)
+# 色は青
+plt.plot(fpr, tpr, label="mean (area = %.2f)" % auc, linestyle="--", color="blue")
+
+plt.legend()
+plt.title("ROC curve")
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.grid(True)
+plt.savefig("{}/{}_roc_curve.png".format(model_path, args.dataset))

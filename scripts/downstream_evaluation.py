@@ -99,18 +99,6 @@ def downstream(model_init, dataset):
         preds_labels_all.append([preds_fold, labels_fold])
         
     return preds_labels_all
-
-def roc_curve(preds, labels):
-    # ROC曲線を描画
-    fpr, tpr, thresholds = metrics.roc_curve(labels, preds)
-    auc = metrics.auc(fpr, tpr)
-    plt.plot(fpr, tpr, label="ROC curve (area = %.2f)" % auc)
-    plt.legend()
-    plt.title("ROC curve")
-    plt.xlabel("False Positive Rate")
-    plt.ylabel("True Positive Rate")
-    plt.grid(True)
-    plt.show()
  
 # コマンドライン引数の処理
 parser = argparse.ArgumentParser()

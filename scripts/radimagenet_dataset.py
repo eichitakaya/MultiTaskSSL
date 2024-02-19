@@ -84,7 +84,52 @@ class RadImageNet(Dataset):
         # ラベルをTensor型に変換
         label = torch.from_numpy(label)
         return img, label, img_path
+
+
+# RadImageNetを継承した教師あり対照学習用のデータセットクラス
+class RadImageNetForSupCon(RadImageNet):
+    """
+    RadImageNet dataset class for supervised contrastive learning.
+    The format of output is (image, label).
+    Label is 3-dim vector, where each element is corresponding to the label of modalities, anatomy, and disease. 
+    Example: [0, 1, 2] means the image is from CT, Abdomen, and Abdominal Aortic Aneurysm.
+    """
+    def __init__(self, root, transform=None, target_transform=None):
+        """
+        Constructor for RadImageNet dataset class.
+        This does not load the data into memory.
+        
+        """
+        super(RadImageNetForSupCon, self).__init__(root, transform, target_transform)
     
+    def __getitem__(self, idx):
+        """
+        Returns the item at the given index.
+        Loads the image, label and img_path at the given index.
+        Label is 3-dim vector, where each element is corresponding to the label of modalities, anatomy, and disease.
+        """
+        # 画像の読み込み
+        img_path = self.paths[idx]
+        img = Image.open(img_path)
+        img = self.transform(img)
+        # ここで2枚分のリストになっている
+
+        # ラベルの作成
+        label = np.zeros(3)
+        # モダリティのラベル
+        modality = img_path.split("/")[-4]
+        label[0] = self.modality_dict[modality]
+        # 解剖学のラベル
+        anatomy = img_path.split("/")[-3]
+        label[1] = self.anatomy_dict[anatomy]
+        # 疾患のラベル
+        disease = img_path.split("/")[-2]
+        label[2] = self.disease_dict[disease]
+        # ラベルをint型に変換
+        label = label.astype(np.int64)
+        # ラベルをTensor型に変換
+        label = torch.from_numpy(label)
+        return img, label, img_path
 
 # test
 if __name__ == "__main__":

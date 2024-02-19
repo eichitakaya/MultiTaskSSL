@@ -15,7 +15,7 @@ import copy
 
 
 # modelとdatasetを引数に取り、評価を行う関数
-def downstream(model_init, dataset):
+def downstream(model_init, dataset, epochs=10, batchsize=32):
     if dataset == "thyroid":
         dataset = dd.ThyroidDataset
     if dataset == "breast":
@@ -30,9 +30,9 @@ def downstream(model_init, dataset):
         val_dataset = dataset(i+1, "val", transform=transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()]))
         test_dataset = dataset(i+1, "test", transform=transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()]))
         # データローダーの作成
-        train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=True)
-        val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=32, shuffle=True)
-        test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=True)
+        train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batchsize, shuffle=True)
+        val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batchsize, shuffle=True)
+        test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=batchsize, shuffle=True)
         # モデルの定義
         model = copy.deepcopy(model_init)
         # 損失関数の定義
@@ -49,7 +49,7 @@ def downstream(model_init, dataset):
         best_val_loss = 10000
         model.train()
 
-        for epoch in range(1):
+        for epoch in range(epochs):
             model.train()
             running_loss = 0.0
             for inputs, labels in train_dataloader:
@@ -57,11 +57,12 @@ def downstream(model_init, dataset):
                 labels = labels.to("cuda:0")
                 optimizer.zero_grad()
                 outputs = model(inputs)
+                #print(outputs.shape)
                 loss = criterion(outputs, labels)
                 loss.backward()
                 optimizer.step()
                 running_loss += loss.item()
-            print("epoch: {}, loss: {}".format(epoch, running_loss))
+            print("epoch: {}, loss: {}".format(epoch+1, running_loss))
             scheduler.step()
             # validation
             model.eval()
@@ -102,8 +103,12 @@ def downstream(model_init, dataset):
  
 # コマンドライン引数の処理
 parser = argparse.ArgumentParser()
+
 parser.add_argument("--dataset", type=str)
 parser.add_argument("--model_path", type=str)
+parser.add_argument("--epochs", type=int)
+parser.add_argument("--batchsize", type=int)
+
 args = parser.parse_args()
 
 # モデルの定義と学習済みパラメータの読み込み
@@ -113,7 +118,7 @@ model = torchvision.models.vit_b_16(weights=torchvision.models.ViT_B_16_Weights.
 model.fc = nn.Linear(in_features=512, out_features=165, bias=True)
 
 # モデルの評価
-result = downstream(model, dataset=args.dataset)
+result = downstream(model, dataset=args.dataset, epochs=args.epochs, batchsize=args.batchsize)
 #print(result)
 # 評価結果の集計と保存
 # result自体を5つのcsvに保存
@@ -123,12 +128,15 @@ result = downstream(model, dataset=args.dataset)
 
 # resultの保存
 import csv
+import os
 # model_pathからmodel.pthを取り除いたものを取得
 model_path = args.model_path.split("/")
 model_path = "/".join(model_path[:-1])
 # foldごとの結果を保存
+# dataset名のフォルダを作成
+os.makedirs(model_path + f"/{args.dataset}", exist_ok=True)
 for i in range(5):
-    with open("{}/{}_fold_{}.csv".format(model_path, args.dataset, i+1), "w") as f:
+    with open("{}/{}/fold_{}.csv".format(model_path, args.dataset, i+1), "w") as f:
         writer = csv.writer(f)
         writer.writerow(["preds", "labels"])
         # 1である確率とlabelsを保存
@@ -165,7 +173,7 @@ sensitivity_mean = np.mean(sensitivities)
 specificity_mean = np.mean(specificities)
 
 # accs, aucs, sensitivities, specificitiesおよびそれらの平均をcsvに保存
-with open("{}/{}_stats.csv".format(model_path, args.dataset), "w") as f:
+with open("{}/{}/stats.csv".format(model_path, args.dataset), "w") as f:
     writer = csv.writer(f)
     writer.writerow(["acc", "auc", "sensitivity", "specificity"])
     for i in range(5):
@@ -201,4 +209,4 @@ plt.title("ROC curve")
 plt.xlabel("False Positive Rate")
 plt.ylabel("True Positive Rate")
 plt.grid(True)
-plt.savefig("{}/{}_roc_curve.png".format(model_path, args.dataset))
+plt.savefig("{}/{}/roc_curve.png".format(model_path, args.dataset))

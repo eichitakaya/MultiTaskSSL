@@ -67,7 +67,7 @@ for epoch in range(epochs):
         loss_multi.backward()
         optimizer.step()
     # モデルの保存
-    model_path = os.path.join("/takaya_workspace/Medical_AI/MultiTaskSSL/models/mtssl/", "model_epoch" + str(epoch+1) + ".pth")
+    model_path = os.path.join("/takaya_workspace/MultiTaskSSL/models/mtssl/", "model_epoch" + str(epoch+1) + ".pth")
     torch.save(model.state_dict(), model_path)
 
         

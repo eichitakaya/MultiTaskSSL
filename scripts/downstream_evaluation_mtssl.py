@@ -13,9 +13,26 @@ import downstream_small_dataset as dd
 import argparse
 import copy
 
+import timm
+
+import models_mae
+
+class VitEncoder(nn.Module):
+    def __init__(self, pretrained_model_path):
+        super(VitEncoder, self).__init__()
+        self.model = models_mae.__dict__["mae_vit_large_patch16"]()
+        self.model.load_state_dict(torch.load(pretrained_model_path))
+        self.fc = nn.Linear(201728, 2)
+        
+    def forward(self, x):
+        x, _, _ = self.model.forward_encoder(x, mask_ratio=0)
+        x = x.view(x.size(0), -1) # shape: (batchsize, 51200)
+        x = self.fc(x)
+        return x
+
 
 # modelとdatasetを引数に取り、評価を行う関数
-def downstream(model_init, dataset, epochs=10, batchsize=32):
+def downstream(model_path, dataset, epochs=10, batchsize=32):
     if dataset == "thyroid":
         dataset = dd.ThyroidDataset
     if dataset == "breast":
@@ -34,15 +51,14 @@ def downstream(model_init, dataset, epochs=10, batchsize=32):
         val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batchsize, shuffle=True)
         test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=batchsize, shuffle=True)
         # モデルの定義
-        model = copy.deepcopy(model_init)
+        model = VitEncoder(model_path)
+        model = model.to("cuda:1")
         # 損失関数の定義
         criterion = nn.CrossEntropyLoss()
         # 最適化手法の定義
-        optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+        optimizer = optim.Adam(model.parameters(), lr=0.0001)
         # 学習率のスケジューラーの定義
         scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
-        # モデルの定義
-        model = model.to("cuda:0")
         
         # 学習ループ
         # testは、valのlossが最小のモデルを使用
@@ -53,11 +69,10 @@ def downstream(model_init, dataset, epochs=10, batchsize=32):
             model.train()
             running_loss = 0.0
             for inputs, labels in train_dataloader:
-                inputs = inputs.to("cuda:0")
-                labels = labels.to("cuda:0")
+                inputs = inputs.to("cuda:1")
+                labels = labels.to("cuda:1")
                 optimizer.zero_grad()
                 outputs = model(inputs)
-                #print(outputs.shape)
                 loss = criterion(outputs, labels)
                 loss.backward()
                 optimizer.step()
@@ -69,8 +84,8 @@ def downstream(model_init, dataset, epochs=10, batchsize=32):
             val_loss = 0.0
             with torch.no_grad():
                 for inputs, labels in val_dataloader:
-                    inputs = inputs.to("cuda:0")
-                    labels = labels.to("cuda:0")
+                    inputs = inputs.to("cuda:1")
+                    labels = labels.to("cuda:1")
                     outputs = model(inputs)
                     loss = criterion(outputs, labels)
                     val_loss += loss.item()
@@ -87,8 +102,8 @@ def downstream(model_init, dataset, epochs=10, batchsize=32):
         labels_fold = []
         with torch.no_grad():
             for inputs, labels in test_dataloader:
-                inputs = inputs.to("cuda:0")
-                labels = labels.to("cuda:0")
+                inputs = inputs.to("cuda:1")
+                labels = labels.to("cuda:1")
                 outputs = best_model(inputs)
                 loss = criterion(outputs, labels)
                 test_loss += loss.item() * inputs.size(0)
@@ -111,14 +126,8 @@ parser.add_argument("--batchsize", type=int)
 
 args = parser.parse_args()
 
-# モデルの定義と学習済みパラメータの読み込み
-# vitを使う
-model = torchvision.models.vit_b_16(weights=torchvision.models.ViT_B_16_Weights.DEFAULT)
-# モデルの最終層の出力ユニットを165に変更
-model.fc = nn.Linear(in_features=512, out_features=165, bias=True)
-
 # モデルの評価
-result = downstream(model, dataset=args.dataset, epochs=args.epochs, batchsize=args.batchsize)
+result = downstream(model_path=args.model_path, dataset=args.dataset, epochs=args.epochs, batchsize=args.batchsize)
 #print(result)
 # 評価結果の集計と保存
 # result自体を5つのcsvに保存
@@ -154,6 +163,7 @@ for i in range(5):
     preds = result[i][0]
     labels = result[i][1]
     preds = np.array(preds)
+    print(preds.shape)
     labels = np.array(labels)
     fpr, tpr, thresholds = metrics.roc_curve(labels, preds)
     auc = metrics.auc(fpr, tpr)

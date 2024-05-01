@@ -42,7 +42,7 @@ def downstream(model_init, dataset, epochs=10, batchsize=32):
         # 学習率のスケジューラーの定義
         scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
         # モデルの定義
-        model = model.to("cuda:0")
+        model = model.to("cuda:1")
         
         # 学習ループ
         # testは、valのlossが最小のモデルを使用
@@ -53,8 +53,8 @@ def downstream(model_init, dataset, epochs=10, batchsize=32):
             model.train()
             running_loss = 0.0
             for inputs, labels in train_dataloader:
-                inputs = inputs.to("cuda:0")
-                labels = labels.to("cuda:0")
+                inputs = inputs.to("cuda:1")
+                labels = labels.to("cuda:1")
                 optimizer.zero_grad()
                 outputs = model(inputs)
                 #print(outputs.shape)
@@ -69,8 +69,8 @@ def downstream(model_init, dataset, epochs=10, batchsize=32):
             val_loss = 0.0
             with torch.no_grad():
                 for inputs, labels in val_dataloader:
-                    inputs = inputs.to("cuda:0")
-                    labels = labels.to("cuda:0")
+                    inputs = inputs.to("cuda:1")
+                    labels = labels.to("cuda:1")
                     outputs = model(inputs)
                     loss = criterion(outputs, labels)
                     val_loss += loss.item()
@@ -87,8 +87,8 @@ def downstream(model_init, dataset, epochs=10, batchsize=32):
         labels_fold = []
         with torch.no_grad():
             for inputs, labels in test_dataloader:
-                inputs = inputs.to("cuda:0")
-                labels = labels.to("cuda:0")
+                inputs = inputs.to("cuda:1")
+                labels = labels.to("cuda:1")
                 outputs = best_model(inputs)
                 loss = criterion(outputs, labels)
                 test_loss += loss.item() * inputs.size(0)

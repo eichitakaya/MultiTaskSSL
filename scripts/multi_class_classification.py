@@ -85,6 +85,7 @@ with tqdm(range(num_epochs)) as pbar_epoch:
         with tqdm(enumerate(train_dataloader), total=len(train_dataloader)) as pbar_batch:
             for i, (inputs, labels, paths) in pbar_batch:
                 inputs = inputs.to(device)
+                print(inputs.shape)
                 labels = labels[:, 2].to(device)
                 optimizer.zero_grad()
                 outputs = model(inputs)
